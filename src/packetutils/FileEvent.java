@@ -2,6 +2,11 @@ package packetutils;
 
 import java.io.Serializable;
 
+/**
+ * This class is used to contain all of the necessary data within a file.
+ * @author Alec J Strickland
+ *
+ */
 public class FileEvent implements Serializable {
 
 	/**

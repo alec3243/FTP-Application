@@ -31,7 +31,7 @@ import javafx.stage.Stage;
  * TCPServer object running on its own thread. This class connects to the server
  * by creating a TCPClient object and executing it using a Thread. At no time
  * does this class instantiate a TCPServer object; the server must be executed
- * independently of this class as well as the TCPClient class.
+ * independently of this class.
  * 
  * @author Alec J Strickland
  *
@@ -61,14 +61,12 @@ public class FtpApplication extends Application {
 		final VBox vbox = new VBox();
 		// Used to get the IP address and port number that the client wants to
 		// connect to.
-		final Label ipLabel = new Label("IP:    ");
-		final Label portLabel = new Label("Port:");
-		final TextField ipField = new TextField("Enter IP Address Here.");
-		ipField.setStyle("-fx-prompt-text-fill: derive(-fx-control-inner-background, -30%);");
+		final Label ipLabel = new Label("IP Address:");
+		final Label portLabel = new Label("Port Number:");
+		final TextField ipField = new TextField();
 		final Button enter = new Button("Enter");
 
-		final TextField portField = new TextField("Enter The Port Here.");
-		portField.setStyle("-fx-prompt-text-fill: derive(-fx-control-inner-background, -30%);");
+		final TextField portField = new TextField();
 		final VBox vbox2 = new VBox();
 		vbox.getChildren().addAll(ipLabel, ipField);
 		vbox2.getChildren().addAll(portLabel, portField);
@@ -182,14 +180,12 @@ public class FtpApplication extends Application {
 		hbox.getChildren().add(sceneTitle);
 		hbox.setPadding(new Insets(0, 0, 0, 60));
 		grid.add(hbox, 0, 0);
-		TCPClient client = new TCPClient();
-		client.setIP(ipAddress);
-		client.setPort(Integer.parseInt(port));
+		TCPClient client = new TCPClient(ipAddress, Integer.parseInt(port));
 		// Start TCP connection
 		new Thread(client).start();
 		// Wait for handshake
 		while (!client.isReady()) {
-			System.out.println("well shit");
+			Thread.yield();
 		}
 		// Retrieve file names from TCPClient thread
 		final HashSet<File> filesSet = client.getFiles();
@@ -242,7 +238,7 @@ public class FtpApplication extends Application {
 		final Button exitBtn = new Button("Exit");
 		exitBtn.setOnAction((event) -> {
 			try {
-				client.killThread();
+				client.stop();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -271,6 +267,11 @@ public class FtpApplication extends Application {
 		((Group) scene.getRoot()).getChildren().add(grid);
 		stage.setHeight(HEIGHT);
 		stage.setWidth(WIDTH * 1.07);
+		scene.setOnKeyPressed((event) -> {
+			if (event.getCode() == KeyCode.ENTER) {
+				downloadBtn.fire();
+			}
+		});
 		stage.setScene(scene);
 	}
 }
