@@ -13,12 +13,13 @@ import java.util.HashSet;
  * This class is intended to be executed as its own thread. The user is meant to
  * supply a raw IP address in the form of a string, and a port as an integer.
  * When the object attempts to connect to a TCPServer object, it will use the IP
- * and port to do so through a Socket object.
+ * and port to do so securely over SSL/TLS security protocols using an
+ * SSLSocket.
  * 
  * @author Alec J Strickland
  *
  */
-public class TCPClient implements Runnable {
+public class TCPClient implements RunnableEndPoint {
 
 	private HashSet<File> files;
 	private String input;
@@ -147,8 +148,9 @@ public class TCPClient implements Runnable {
 			// Confirm that file successfully transfered
 			outToServer.writeObject(new Boolean(true));
 			System.out.println("Successfully received " + input + " from server.");
+			outToServer.reset();
 		} catch (SocketException e) {
-			clientSocket.close();
+			e.printStackTrace();
 			// beginConnection();
 		}
 	}
@@ -159,8 +161,11 @@ public class TCPClient implements Runnable {
 	 * 
 	 * @throws IOException
 	 */
-	public void killThread() throws IOException {
-		clientSocket.close();
+	@Override
+	public void stop() throws IOException {
+		if (!clientSocket.isClosed()) {
+			clientSocket.close();
+		}
 		Thread.currentThread().interrupt();
 	}
 

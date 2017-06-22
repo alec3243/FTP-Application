@@ -1,6 +1,7 @@
 package packetutils;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -20,12 +21,14 @@ import java.util.Scanner;
  * text file in the project directory named "config.cfg", which supplies the
  * directory on the first line containing all available files for the server to
  * transfer, and the port number on the second line which the server will be
- * bound to upon running.
+ * bound to upon running. All communications are done securely over SSL/TLS
+ * security protocols using an SSLServerSocket object to communicate with the
+ * client.
  * 
  * @author Alec J Strickland
  *
  */
-public class TCPServer implements Runnable {
+public class TCPServer implements RunnableEndPoint {
 	private final File CFG_FILE = new File("config.cfg");
 	private HashSet<File> files;
 	private ObjectInputStream inFromClient;
@@ -58,20 +61,30 @@ public class TCPServer implements Runnable {
 	 */
 	private void beginConnection() throws IOException {
 		// Establish server end-point socket
-		serverSocket = new ServerSocket(port);
-		files = new HashSet<>();
-		// Wait for handshake with client
-		connectionSocket = serverSocket.accept();
-		connectionSocket.setKeepAlive(true);
-		// Establish streams
-		inFromClient = new ObjectInputStream(connectionSocket.getInputStream());
-		outToClient = new ObjectOutputStream(connectionSocket.getOutputStream());
+		try {
+			serverSocket = new ServerSocket(port);
+
+			files = new HashSet<>();
+			// Wait for handshake with client
+			connectionSocket = serverSocket.accept();
+			connectionSocket.setKeepAlive(true);
+			// Establish streams
+			inFromClient = new ObjectInputStream(connectionSocket.getInputStream());
+			outToClient = new ObjectOutputStream(connectionSocket.getOutputStream());
+		} catch (IOException e) {
+			stop();
+		}
 	}
 
 	// Closes both sockets and interrupts the thread.
-	public void killThread() throws IOException {
-		connectionSocket.close();
-		serverSocket.close();
+	@Override
+	public void stop() throws IOException {
+		if (!connectionSocket.isClosed()) {
+			connectionSocket.close();
+		}
+		if (!serverSocket.isClosed()) {
+			serverSocket.close();
+		}
 		Thread.currentThread().interrupt();
 	}
 
@@ -86,8 +99,9 @@ public class TCPServer implements Runnable {
 		// Send the file set to the output stream.
 		outToClient.writeObject(files);
 		// Get client input for file name
-		try {
-			while (true) {
+		while (true) {
+			try {
+
 				String clientInput = (String) inFromClient.readObject();
 				// Append '\' to the end of the path if it has not already been
 				// done
@@ -104,13 +118,11 @@ public class TCPServer implements Runnable {
 					// Write the object to the output stream
 					outToClient.writeObject(fileEvent);
 				} while (!((Boolean) inFromClient.readObject()).booleanValue());
+			} catch (SocketTimeoutException | SocketException | EOFException e) {
+				stop();
 			}
-		} catch (SocketTimeoutException | SocketException e) {
-			connectionSocket.close();
-			serverSocket.close();
-			// serverSocket = new ServerSocket(9876);
-			// connectionSocket = serverSocket.accept();
 		}
+
 	}
 
 	/**
