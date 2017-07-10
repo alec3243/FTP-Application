@@ -7,14 +7,12 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.HashSet;
 
 /**
  * This class is intended to be executed as its own thread. The user is meant to
  * supply a raw IP address in the form of a string, and a port as an integer.
- * When the object attempts to connect to a TCPServer object, it will use the IP
- * and port to do so securely over SSL/TLS security protocols using an
- * SSLSocket.
  * 
  * @author Alec J Strickland
  *
@@ -28,6 +26,7 @@ public class TCPClient implements RunnableEndPoint {
 	private Socket clientSocket;
 	private String ipAddress;
 	private int port;
+	private FtpApplication app;
 
 	public TCPClient() {
 
@@ -43,16 +42,21 @@ public class TCPClient implements RunnableEndPoint {
 	 * @param port
 	 *            The port that the target server is bound to.
 	 */
-	public TCPClient(String ip, int port) {
+	public TCPClient(String ip, int port, FtpApplication app) {
 		this.ipAddress = ip;
 		this.port = port;
+		this.app = app;
 	}
 
 	/**
 	 * Attempts to open a connection with a server.
+	 * 
+	 * @throws IOException
+	 * @throws UnknownHostException
 	 */
 	@SuppressWarnings("unchecked")
-	private void beginConnection() {
+	private synchronized boolean beginConnection() throws UnknownHostException, IOException {
+		// synchronized (this) {
 		input = null;
 		try {
 			// Attempt to handshake
@@ -66,8 +70,10 @@ public class TCPClient implements RunnableEndPoint {
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
-			e.printStackTrace();
+			return false;
 		}
+		return true;
+		// }
 	}
 
 	public void setIP(String ip) {
@@ -112,6 +118,10 @@ public class TCPClient implements RunnableEndPoint {
 
 	public HashSet<File> getFiles() {
 		return files;
+	}
+
+	public Socket getSocket() {
+		return clientSocket;
 	}
 
 	/**
@@ -162,11 +172,10 @@ public class TCPClient implements RunnableEndPoint {
 	 * @throws IOException
 	 */
 	@Override
-	public void stop() throws IOException {
+	public void close() throws IOException {
 		if (!clientSocket.isClosed()) {
 			clientSocket.close();
 		}
-		Thread.currentThread().interrupt();
 	}
 
 	// Will return true if the client is connected and has received the files
@@ -180,8 +189,18 @@ public class TCPClient implements RunnableEndPoint {
 		return clientSocket.isConnected();
 	}
 
+	public boolean isConnected() {
+		return clientSocket.isConnected();
+	}
+
 	@Override
 	public void run() {
-		beginConnection();
+		try {
+			app.setConnected(beginConnection());
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+
+		}
 	}
 }
