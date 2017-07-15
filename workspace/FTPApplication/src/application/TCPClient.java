@@ -26,7 +26,6 @@ public class TCPClient implements RunnableEndPoint {
 	private Socket clientSocket;
 	private String ipAddress;
 	private int port;
-	private FtpApplication app;
 
 	public TCPClient() {
 
@@ -42,10 +41,9 @@ public class TCPClient implements RunnableEndPoint {
 	 * @param port
 	 *            The port that the target server is bound to.
 	 */
-	public TCPClient(String ip, int port, FtpApplication app) {
+	public TCPClient(String ip, int port) {
 		this.ipAddress = ip;
 		this.port = port;
-		this.app = app;
 	}
 
 	/**
@@ -194,7 +192,7 @@ public class TCPClient implements RunnableEndPoint {
 	@Override
 	public void run() {
 		try {
-			app.setConnected(beginConnection());
+			beginConnection();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

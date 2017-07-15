@@ -38,24 +38,21 @@ public class TCPServerManager implements Runnable {
 	@Override
 	public void run() {
 		try {
-			while (true) {
-				if (currentPort > MAX_PORT) {
-					break;
-				}
+			System.out.println("Push 'x' to terminate servers.");
+//			Scanner in = new Scanner(System.in);
+			while (currentPort < MAX_PORT) {
 				listen();
+//				if (in.next().equals("x")) {
+//					for (ServerSocket s : serverSockets) {
+//						if (!s.isClosed()) {
+//							s.close();
+//						}
+//					}
+//					System.out.println("Sockets closed.");
+//					break;
+//				}
 			}
-			Scanner in = new Scanner(System.in);
-			while (true) {
-				if (in.next().equals("x")) {
-					for (ServerSocket s : serverSockets) {
-						if (!s.isClosed()) {
-							s.close();
-						}
-					}
-					break;
-				}
-			}
-			in.close();
+//			in.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

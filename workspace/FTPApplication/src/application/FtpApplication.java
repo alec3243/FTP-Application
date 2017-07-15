@@ -22,7 +22,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
@@ -39,16 +38,14 @@ import javafx.stage.Stage;
  *
  */
 public class FtpApplication extends Application {
-	private Stage stage;
 	private TCPClient client;
-	private boolean connected;
 	private boolean invalidInputLabelExists;
 	private boolean timeoutLabelExists;
 
 	public FtpApplication() {
 		client = null;
-		connected = false;
 		invalidInputLabelExists = false;
+		timeoutLabelExists = false;
 	}
 
 	public void startApplication() {
@@ -60,8 +57,8 @@ public class FtpApplication extends Application {
 	 * IP address and a port number that will be used to connect to a server.
 	 */
 	@Override
-	public void start(Stage stage) throws Exception {
-		this.stage = stage;
+	public void start(Stage arg0) throws Exception {
+		Stage stage = arg0;
 		stage.setTitle("FTP Application");
 		stage.setWidth(400);
 		stage.setHeight(220);
@@ -96,7 +93,7 @@ public class FtpApplication extends Application {
 			if (confirmInput(portFieldText, ipFieldText)) {
 				// Once it is known that both values are valid, enter
 				// the main screen.
-				client = new TCPClient(ipFieldText, Integer.parseInt(portFieldText), this);
+				client = new TCPClient(ipFieldText, Integer.parseInt(portFieldText));
 				// Start TCP connection and thread
 				Thread t = new Thread(client);
 				t.setDaemon(true);
@@ -123,7 +120,7 @@ public class FtpApplication extends Application {
 					}
 				}
 				if (client.isReady()) {
-					mainScreen(this.stage);
+					mainScreen(stage);
 				}
 			} else {
 				if (!invalidInputLabelExists) {
@@ -198,10 +195,6 @@ public class FtpApplication extends Application {
 	private static boolean isNumeric(String str) {
 		return str.matches("-?\\d+(\\.\\d+)?"); // match a number with optional
 												// '-' and decimal.
-	}
-
-	public void setConnected(boolean c) {
-		connected = c;
 	}
 
 	/**
