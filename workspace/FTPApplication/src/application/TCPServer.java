@@ -9,10 +9,11 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.Socket;
 import java.net.SocketException;
 import java.util.HashSet;
 import java.util.Scanner;
+
+import javax.net.ssl.SSLSocket;
 
 /**
  * This class is intended to be executed as its own thread. It is dependent on a
@@ -20,7 +21,7 @@ import java.util.Scanner;
  * directory on the first line containing all available files for the server to
  * transfer, and the port number on the second line which the server will be
  * bound to upon running. All communications are done securely over SSL/TLS
- * security protocols using an SSLServerSocket object to communicate with the
+ * security protocols using an SSLSocket object to communicate with the
  * client.
  * 
  * @author Alec J Strickland
@@ -31,7 +32,7 @@ public class TCPServer implements RunnableEndPoint {
 	private HashSet<File> files;
 	private ObjectInputStream inFromClient;
 	private ObjectOutputStream outToClient;
-	private Socket connectionSocket;
+	private SSLSocket sslConnectionSocket;
 	private String dir;
 
 	/**
@@ -47,11 +48,12 @@ public class TCPServer implements RunnableEndPoint {
 		files = new HashSet<>();
 	}
 
-	public TCPServer(Socket connectionSocket) throws IOException {
-		this.connectionSocket = connectionSocket;
+	public TCPServer(SSLSocket sslConnectionSocket) throws IOException {
+		this.sslConnectionSocket = sslConnectionSocket;
+		this.sslConnectionSocket.startHandshake();
 		try {
-			inFromClient = new ObjectInputStream(this.connectionSocket.getInputStream());
-			outToClient = new ObjectOutputStream(this.connectionSocket.getOutputStream());
+			inFromClient = new ObjectInputStream(this.sslConnectionSocket.getInputStream());
+			outToClient = new ObjectOutputStream(this.sslConnectionSocket.getOutputStream());
 		} catch (IOException e) {
 			close();
 		}
@@ -62,8 +64,8 @@ public class TCPServer implements RunnableEndPoint {
 	// Closes the socket
 	@Override
 	public void close() throws IOException {
-		if (!connectionSocket.isClosed()) {
-			connectionSocket.close();
+		if (!sslConnectionSocket.isClosed()) {
+			sslConnectionSocket.close();
 		}
 	}
 

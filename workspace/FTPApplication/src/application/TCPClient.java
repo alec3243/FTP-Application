@@ -1,6 +1,7 @@
 package application;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -8,11 +9,21 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.security.KeyStore;
 import java.util.HashSet;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 /**
  * This class is intended to be executed as its own thread. The user is meant to
  * supply a raw IP address in the form of a string, and a port as an integer.
+ * All data is sent over SSL/TLS using an SSLSocket.
  * 
  * @author Alec J Strickland
  *
@@ -23,7 +34,7 @@ public class TCPClient implements RunnableEndPoint {
 	private String input;
 	private ObjectOutputStream outToServer;
 	private ObjectInputStream inFromServer;
-	private Socket clientSocket;
+	private SSLSocket sslClientSocket;
 	private String ipAddress;
 	private int port;
 
@@ -47,6 +58,48 @@ public class TCPClient implements RunnableEndPoint {
 	}
 
 	/**
+	 * Returns a SSLContext object using the KeyStore in the project directory.
+	 * 
+	 * @return SSLContext object using local KeyStore file.
+	 */
+	private SSLContext createSSLContext() {
+		try {
+			KeyStore keyStore = KeyStore.getInstance("JKS");
+			/*
+			 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			 * Here you must insert the directory of your keystore file as well as the password for it
+			 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			 */
+			keyStore.load(new FileInputStream("<INSERT KEYSTORE DIRECTORY"), "<INSERT KEYSTORE PASSWORD>".toCharArray());
+
+			// Create key manager
+			KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
+			/*
+			 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			 * Here you must insert the password for your keystore file
+			 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+			 */
+			keyManagerFactory.init(keyStore, "<INSERT KEYSTORE PASSWORD>".toCharArray());
+			KeyManager[] km = keyManagerFactory.getKeyManagers();
+
+			// Create trust manager
+			TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
+			trustManagerFactory.init(keyStore);
+			TrustManager[] tm = trustManagerFactory.getTrustManagers();
+
+			// Initialize SSLContext
+			SSLContext sslContext = SSLContext.getInstance("TLSv1");
+			sslContext.init(km, tm, null);
+
+			return sslContext;
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		return null;
+	}
+
+	/**
 	 * Attempts to open a connection with a server.
 	 * 
 	 * @throws IOException
@@ -55,13 +108,19 @@ public class TCPClient implements RunnableEndPoint {
 	@SuppressWarnings("unchecked")
 	private synchronized boolean beginConnection() throws UnknownHostException, IOException {
 		input = null;
+		String cipherSuites[] = { "SSL_RSA_WITH_3DES_EDE_CBC_SHA", "SSL_DHE_DSS_WITH_3DES_EDE_CBC_SHA",
+				"SSL_DHE_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_NULL_SHA256" };
 		try {
-			// Attempt to handshake
-			clientSocket = new Socket(ipAddress, port);
-			clientSocket.setKeepAlive(true);
+			SSLContext sslContext = createSSLContext();
+			SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+			// Attempt handshake
+			sslClientSocket = (SSLSocket) socketFactory.createSocket(ipAddress, port);
+			sslClientSocket.setEnabledCipherSuites(cipherSuites);
+			sslClientSocket.startHandshake();
+			sslClientSocket.setKeepAlive(true);
 			// Wrap the socket's I/o streams with object streams.
-			outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
-			inFromServer = new ObjectInputStream(clientSocket.getInputStream());
+			outToServer = new ObjectOutputStream(sslClientSocket.getOutputStream());
+			inFromServer = new ObjectInputStream(sslClientSocket.getInputStream());
 			// Retrieve the available files from the server.
 			files = (HashSet<File>) inFromServer.readObject();
 		} catch (ClassNotFoundException e) {
@@ -117,7 +176,7 @@ public class TCPClient implements RunnableEndPoint {
 	}
 
 	public Socket getSocket() {
-		return clientSocket;
+		return sslClientSocket;
 	}
 
 	/**
@@ -132,7 +191,7 @@ public class TCPClient implements RunnableEndPoint {
 	public void sendInput(File file) throws IOException, ClassNotFoundException {
 		try {
 			// If the connection has been closed, attempt to reopen it.
-			if (clientSocket.isClosed()) {
+			if (sslClientSocket.isClosed()) {
 				beginConnection();
 			}
 			// Send file request to server.
@@ -169,24 +228,24 @@ public class TCPClient implements RunnableEndPoint {
 	 */
 	@Override
 	public void close() throws IOException {
-		if (!clientSocket.isClosed()) {
-			clientSocket.close();
+		if (!sslClientSocket.isClosed()) {
+			sslClientSocket.close();
 		}
 	}
 
 	// Will return true if the client is connected and has received the files
 	// from the server.
 	public boolean isReady() {
-		if (clientSocket == null) {
+		if (sslClientSocket == null) {
 			return false;
 		} else if (files == null) {
 			return false;
 		}
-		return clientSocket.isConnected();
+		return sslClientSocket.isConnected();
 	}
 
 	public boolean isConnected() {
-		return clientSocket.isConnected();
+		return sslClientSocket.isConnected();
 	}
 
 	@Override
